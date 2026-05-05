@@ -1,0 +1,78 @@
+@page "/sorteios"
+@rendermode InteractiveServer
+@using MegaAnalyzer.Models
+@using MegaAnalyzer.Services
+@inject ScrapingService Scraping
+
+<h2>🎯 Últimos Sorteios</h2>
+
+<button class="btn btn-primary" @onclick="Atualizar" disabled="@carregando">
+    @if (carregando)
+    {
+        <span>Buscando...</span>
+    }
+    else
+    {
+        <span>🔄 Buscar / Atualizar</span>
+    }
+</button>
+
+@if (!string.IsNullOrEmpty(erro))
+{
+    <div class="alert alert-danger mt-3">@erro</div>
+}
+
+@if (sorteios.Count > 0)
+{
+    <table class="table table-dark table-striped mt-4">
+        <thead>
+            <tr>
+                <th>Concurso</th>
+                <th>Data</th>
+                <th>C1</th>
+                <th>C2</th>
+                <th>C3</th>
+                <th>C4</th>
+                <th>C5</th>
+                <th>C6</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in sorteios)
+            {
+                <tr>
+                    <td>@s.Concurso</td>
+                    <td>@s.Data.ToString("dd/MM/yyyy")</td>
+                    @foreach (var n in s.Numeros.OrderBy(n => n.Posicao))
+                    {
+                        <td><strong>@n.Valor.ToString("D2")</strong></td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Sorteio> sorteios = new();
+    private bool carregando = false;
+    private string erro = string.Empty;
+
+    private async Task Atualizar()
+    {
+        carregando = true;
+        erro = string.Empty;
+        try
+        {
+            sorteios = await Scraping.BuscarEAtualizarSorteiosAsync(20);
+        }
+        catch (Exception ex)
+        {
+            erro = $"Erro ao buscar dados: {ex.Message}";
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}
