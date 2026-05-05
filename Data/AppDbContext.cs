@@ -17,8 +17,13 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {
     public AppDbContext CreateDbContext(string[] args)
     {
+        var dbPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "MegaAnalyzer",
+            "megaanalyzer.db");
+        Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-        optionsBuilder.UseSqlite("Data Source=megaanalyzer.db");
+        optionsBuilder.UseSqlite($"Data Source={dbPath}");
         return new AppDbContext(optionsBuilder.Options);
     }
 }

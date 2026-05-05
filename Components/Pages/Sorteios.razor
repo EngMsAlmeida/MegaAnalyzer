@@ -54,6 +54,10 @@
 }
 
 @code {
+    protected override async Task OnInitializedAsync()
+    {
+        await Atualizar();
+    }
     private List<Sorteio> sorteios = new();
     private bool carregando = false;
     private string erro = string.Empty;

@@ -10,8 +10,14 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 // Banco de dados SQLite
+var dbPath = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+    "MegaAnalyzer",
+    "megaanalyzer.db");
+Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
-    options.UseSqlite("Data Source=megaanalyzer.db"));
+    options.UseSqlite($"Data Source={dbPath}"));
 
 // Serviços
 builder.Services.AddScoped<ScrapingService>();
