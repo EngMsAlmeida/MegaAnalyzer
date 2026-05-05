@@ -16,6 +16,10 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
 // Serviços
 builder.Services.AddScoped<ScrapingService>();
 
+// Serviços
+builder.Services.AddScoped<ScrapingService>();
+builder.Services.AddScoped<AgenteIA>();
+
 var app = builder.Build();
 
 // Garante que o banco é criado com as migrations ao iniciar

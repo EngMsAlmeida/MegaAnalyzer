@@ -9,6 +9,8 @@ public class JogoComScore
     public Dictionary<string, double> Detalhes { get; set; } = new();
     public string DezenasFormatadas => string.Join(" - ", Dezenas.Select(d => d.ToString("D2")));
     public bool Selecionado { get; set; } = false;
+    public bool GeradoPorIA { get; set; } = false;
+    public string? ExplicacaoIA { get; set; }
 }
 
 public class GeradorJogos
