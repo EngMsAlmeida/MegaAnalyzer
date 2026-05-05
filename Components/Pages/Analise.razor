@@ -1,0 +1,142 @@
+@page "/analise"
+@rendermode InteractiveServer
+@using MegaAnalyzer.Models
+@using MegaAnalyzer.Services
+@using MegaAnalyzer.Services.Analysis
+@inject ScrapingService Scraping
+
+<h2>📊 Análise de Casas</h2>
+
+<div class="mb-3">
+    <label>Últimos quantos sorteios?</label>
+    <input type="number" @bind="quantidadeSorteios" min="3" max="20" class="form-control w-auto d-inline-block mx-2" />
+    <button class="btn btn-primary" @onclick="Analisar" disabled="@carregando">
+        @(carregando ? "Analisando..." : "🔍 Analisar")
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(erro))
+{
+    <div class="alert alert-danger">@erro</div>
+}
+
+@if (faixas.Count > 0)
+{
+    <div class="row">
+        <div class="col-md-6">
+            <h4>Faixas por Casa</h4>
+            <table class="table table-dark table-bordered">
+                <thead>
+                    <tr>
+                        <th>Casa</th>
+                        <th>Mínimo</th>
+                        <th>Máximo</th>
+                        <th>Média</th>
+                        <th>Amplitude</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var f in faixas)
+                    {
+                        <tr>
+                            <td><strong>C@(f.Casa)</strong></td>
+                            <td class="text-success">@f.Minimo.ToString("D2")</td>
+                            <td class="text-danger">@f.Maximo.ToString("D2")</td>
+                            <td class="text-warning">@f.Media</td>
+                            <td>@(f.Maximo - f.Minimo)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="col-md-6">
+            <h4>Jogos Gerados pelas Faixas</h4>
+            <div class="mb-2">
+                <input type="number" @bind="qtdJogos" min="1" max="20" class="form-control w-auto d-inline-block" />
+                <button class="btn btn-success ms-2" @onclick="GerarJogos">🎲 Gerar</button>
+            </div>
+            @if (jogosGerados.Count > 0)
+            {
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    @foreach (var jogo in jogosGerados)
+                    {
+                        <div class="border rounded p-2 bg-dark">
+                            @foreach (var n in jogo)
+                            {
+                                <span class="badge bg-primary me-1">@n.ToString("D2")</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <h4>Valores por Casa nos últimos @quantidadeSorteios sorteios</h4>
+        <table class="table table-dark table-sm">
+            <thead>
+                <tr>
+                    <th>Casa</th>
+                    @foreach (var s in sorteios)
+                    {
+                        <th class="text-muted small">#@s.Concurso</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @for (int casa = 1; casa <= 6; casa++)
+                {
+                    var c = casa;
+                    <tr>
+                        <td><strong>C@(c)</strong></td>
+                        @foreach (var s in sorteios)
+                        {
+                            var num = s.Numeros.FirstOrDefault(n => n.Posicao == c);
+                            <td>@(num?.Valor.ToString("D2") ?? "--")</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private int quantidadeSorteios = 7;
+    private int qtdJogos = 5;
+    private bool carregando = false;
+    private string erro = string.Empty;
+    private List<Sorteio> sorteios = new();
+    private List<ResultadoCasa> faixas = new();
+    private List<List<int>> jogosGerados = new();
+    private AnaliseCasas _analise = new();
+
+    private async Task Analisar()
+    {
+        carregando = true;
+        erro = string.Empty;
+        jogosGerados.Clear();
+        try
+        {
+            sorteios = await Scraping.BuscarEAtualizarSorteiosAsync(quantidadeSorteios);
+            faixas = _analise.Analisar(sorteios);
+        }
+        catch (Exception ex)
+        {
+            erro = ex.Message;
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+
+    private void GerarJogos()
+    {
+        jogosGerados.Clear();
+        for (int i = 0; i < qtdJogos; i++)
+            jogosGerados.Add(_analise.GerarNumeroPorCasa(faixas));
+    }
+}
