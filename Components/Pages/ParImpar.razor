@@ -1,0 +1,138 @@
+@page "/parimpar"
+@rendermode InteractiveServer
+@using MegaAnalyzer.Models
+@using MegaAnalyzer.Services
+@using MegaAnalyzer.Services.Analysis
+@inject ScrapingService Scraping
+
+<h2>⚖️ Análise Par/Ímpar</h2>
+
+<div class="mb-3">
+    <label>Últimos quantos sorteios?</label>
+    <input type="number" @bind="quantidade" min="10" max="100" class="form-control w-auto d-inline-block mx-2" />
+    <button class="btn btn-primary" @onclick="Analisar" disabled="@carregando">
+        @(carregando ? "Analisando..." : "🔍 Analisar")
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(erro))
+{
+    <div class="alert alert-danger">@erro</div>
+}
+
+@if (analisado)
+{
+    <div class="row g-4">
+
+        <div class="col-md-4">
+            <h5>Padrões mais frequentes</h5>
+            <table class="table table-dark table-sm">
+                <thead>
+                    <tr><th>Padrão</th><th>Vezes</th><th>%</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in padroes)
+                    {
+                        var pct = Math.Round((double)p.Value / quantidade * 100, 1);
+                        var destaque = p.Key is "3I3P" or "2I4P" or "4I2P";
+                        <tr class="@(destaque ? "table-warning" : "")">
+                            <td><strong>@p.Key</strong></td>
+                            <td>@p.Value</td>
+                            <td>
+                                <div class="progress" style="height:16px">
+                                    <div class="progress-bar bg-info" style="width:@pct%">@pct%</div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="col-md-8">
+            <h5>Sequência histórica</h5>
+            <div class="d-flex flex-wrap gap-1">
+                @foreach (var r in resultados)
+                {
+                    var corI = r.Impares > r.Pares ? "bg-danger" : r.Impares == r.Pares ? "bg-warning" : "bg-primary";
+                    <div class="text-center" style="width:60px">
+                        <div class="small text-muted">#@r.Concurso</div>
+                        <div class="badge @corI w-100">@r.Padrao</div>
+                    </div>
+                }
+            </div>
+
+            <div class="mt-3">
+                <span class="badge bg-danger me-2">Ímpar dominante</span>
+                <span class="badge bg-warning text-dark me-2">Equilibrado</span>
+                <span class="badge bg-primary">Par dominante</span>
+            </div>
+        </div>
+
+    </div>
+
+    <h5 class="mt-4">Detalhe por sorteio</h5>
+    <table class="table table-dark table-sm">
+        <thead>
+            <tr>
+                <th>Concurso</th>
+                <th>Ímpares</th>
+                <th>Pares</th>
+                <th>Padrão</th>
+                <th>Visual</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in resultados.Take(20))
+            {
+                <tr>
+                    <td>@r.Concurso</td>
+                    <td class="text-danger">@r.Impares</td>
+                    <td class="text-primary">@r.Pares</td>
+                    <td><strong>@r.Padrao</strong></td>
+                    <td>
+                        @for (int i = 0; i < r.Impares; i++)
+                        {
+                            <span class="badge bg-danger me-1">I</span>
+                        }
+                        @for (int i = 0; i < r.Pares; i++)
+                        {
+                            <span class="badge bg-primary me-1">P</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private int quantidade = 30;
+    private bool carregando = false;
+    private bool analisado = false;
+    private string erro = string.Empty;
+    private List<ResultadoParImpar> resultados = new();
+    private Dictionary<string, int> padroes = new();
+    private AnaliseParImpar analise = new();
+
+    private async Task Analisar()
+    {
+        carregando = true;
+        erro = string.Empty;
+        try
+        {
+            var sorteios = await Scraping.BuscarEAtualizarSorteiosAsync(quantidade);
+            resultados = analise.AnalisarTodos(sorteios);
+            padroes = analise.ContarPadroes(sorteios);
+            analisado = true;
+        }
+        catch (Exception ex)
+        {
+            erro = ex.Message;
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}
