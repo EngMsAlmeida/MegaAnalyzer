@@ -1,0 +1,142 @@
+@page "/gerador"
+@rendermode InteractiveServer
+@using MegaAnalyzer.Models
+@using MegaAnalyzer.Services
+@using MegaAnalyzer.Services.Analysis
+@inject ScrapingService Scraping
+
+<h2>🎯 Gerador de Jogos</h2>
+
+<div class="mb-3 d-flex align-items-center gap-3 flex-wrap">
+    <div>
+        <label>Sorteios para análise</label>
+        <input type="number" @bind="quantidade" min="10" max="100" class="form-control w-auto d-inline-block mx-2" />
+    </div>
+    <div>
+        <label>Jogos a gerar</label>
+        <input type="number" @bind="qtdJogos" min="5" max="50" class="form-control w-auto d-inline-block mx-2" />
+    </div>
+    <button class="btn btn-success btn-lg" @onclick="Gerar" disabled="@carregando">
+        @(carregando ? "Gerando..." : "🎲 Gerar Jogos")
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(erro))
+{
+    <div class="alert alert-danger">@erro</div>
+}
+
+@if (jogos.Count > 0)
+{
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5>@jogos.Count jogos gerados — selecione até 3 para o Agente IA</h5>
+        <span class="badge bg-info fs-6">@selecionados.Count / 3 selecionados</span>
+    </div>
+
+    <div class="row g-3">
+        @foreach (var jogo in jogos)
+        {
+            var selecionado = selecionados.Contains(jogo);
+            var borderStyle = selecionado ? "border:2px solid #22c55e" : "border:1px solid #374151";
+            <div class="col-md-6 col-lg-4">
+                <div class="p-3 rounded" style="background:#111827;@borderStyle;cursor:pointer"
+                     @onclick="() => ToggleSelecao(jogo)">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex gap-1 flex-wrap">
+                            @foreach (var d in jogo.Dezenas)
+                            {
+                                <span class="badge fs-6" style="background:#1d4ed8">@d.ToString("D2")</span>
+                            }
+                        </div>
+                        @if (selecionado)
+                        {
+                            <span class="badge bg-success">✓</span>
+                        }
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="progress flex-grow-1 me-2" style="height:8px">
+                            <div class="progress-bar @(jogo.Score >= 70 ? "bg-success" : jogo.Score >= 50 ? "bg-warning" : "bg-danger")"
+                                 style="width:@(jogo.Score)%"></div>
+                        </div>
+                        <span class="badge @(jogo.Score >= 70 ? "bg-success" : jogo.Score >= 50 ? "bg-warning" : "bg-danger")">
+                            @jogo.Score pts
+                        </span>
+                    </div>
+                    <div class="mt-2 small text-muted">
+                        @foreach (var d in jogo.Detalhes)
+                        {
+                            <span class="me-2">@d.Key: @d.Value</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (selecionados.Count > 0)
+    {
+        <div class="mt-4 p-3 rounded" style="background:#0f172a;border:1px solid #22c55e">
+            <h5 class="text-success">✅ Jogos Selecionados</h5>
+            @foreach (var j in selecionados)
+            {
+                <div class="mb-1">
+                    @foreach (var d in j.Dezenas)
+                    {
+                        <span class="badge bg-success me-1">@d.ToString("D2")</span>
+                    }
+                    <span class="text-muted small ms-2">Score: @j.Score</span>
+                </div>
+            }
+            @if (selecionados.Count >= 2)
+            {
+                <button class="btn btn-warning mt-2" @onclick="EnviarParaIA">
+                    🤖 Enviar para Agente IA
+                </button>
+            }
+        </div>
+    }
+}
+
+@code {
+    private int quantidade = 20;
+    private int qtdJogos = 15;
+    private bool carregando = false;
+    private string erro = string.Empty;
+    private List<JogoComScore> jogos = new();
+    private List<JogoComScore> selecionados = new();
+    private GeradorJogos gerador = new();
+
+    private async Task Gerar()
+    {
+        carregando = true;
+        erro = string.Empty;
+        jogos.Clear();
+        selecionados.Clear();
+        try
+        {
+            var sorteios = await Scraping.BuscarEAtualizarSorteiosAsync(quantidade);
+            jogos = gerador.Gerar(sorteios, qtdJogos);
+        }
+        catch (Exception ex)
+        {
+            erro = ex.Message;
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+
+    private void ToggleSelecao(JogoComScore jogo)
+    {
+        if (selecionados.Contains(jogo))
+            selecionados.Remove(jogo);
+        else if (selecionados.Count < 3)
+            selecionados.Add(jogo);
+    }
+
+    private void EnviarParaIA()
+    {
+        // próximo passo — agente IA
+    }
+}
