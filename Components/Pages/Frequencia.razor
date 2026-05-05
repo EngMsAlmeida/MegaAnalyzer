@@ -1,0 +1,149 @@
+@page "/frequencia"
+@rendermode InteractiveServer
+@using MegaAnalyzer.Models
+@using MegaAnalyzer.Services
+@using MegaAnalyzer.Services.Analysis
+@inject ScrapingService Scraping
+
+<h2>🔥 Frequência dos Números</h2>
+
+<div class="mb-3">
+    <label>Últimos quantos sorteios?</label>
+    <input type="number" @bind="quantidade" min="10" max="200" class="form-control w-auto d-inline-block mx-2" />
+    <button class="btn btn-primary" @onclick="Analisar" disabled="@carregando">
+        @(carregando ? "Analisando..." : "🔍 Analisar")
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(erro))
+{
+    <div class="alert alert-danger">@erro</div>
+}
+
+@if (analisado)
+{
+    <!-- Cartela colorida por temperatura -->
+    <h5>Mapa de Temperatura (@quantidade sorteios)</h5>
+    <div style="font-family:monospace;line-height:2.2">
+        @foreach (var f in frequencias)
+        {
+            var cor = f.Status switch {
+                "Quente" => "background:#7f1d1d;color:#fca5a5",
+                "Frio"   => "background:#1e3a5f;color:#93c5fd",
+                _        => "background:#1f2937;color:#d1d5db"
+            };
+            <span style="display:inline-block;width:38px;text-align:center;margin:2px;padding:3px;border-radius:6px;font-size:0.8rem;@cor"
+                  title="@f.Numero: @f.Frequencia vezes (@f.Percentual%)">
+                @f.Numero.ToString("D2")
+            </span>
+            if (f.Numero % 10 == 0) { <br /> }
+        }
+    </div>
+    <div class="mt-2 small">
+        <span style="background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:4px">🔥 Quente</span>
+        <span style="background:#1f2937;color:#d1d5db;padding:2px 8px;border-radius:4px" class="ms-2">Normal</span>
+        <span style="background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px" class="ms-2">❄️ Frio</span>
+    </div>
+
+    <div class="row mt-4 g-4">
+        <!-- Mais quentes -->
+        <div class="col-md-4">
+            <h5>🔥 Mais Quentes</h5>
+            <table class="table table-dark table-sm">
+                <thead><tr><th>Nº</th><th>Vezes</th><th>%</th><th>Desvio</th></tr></thead>
+                <tbody>
+                    @foreach (var f in analise.MaisQuentes(frequencias))
+                    {
+                        <tr>
+                            <td><span class="badge bg-danger">@f.Numero.ToString("D2")</span></td>
+                            <td>@f.Frequencia</td>
+                            <td>@f.Percentual%</td>
+                            <td class="text-danger">+@f.Desvio</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Mais frios -->
+        <div class="col-md-4">
+            <h5>❄️ Mais Frios</h5>
+            <table class="table table-dark table-sm">
+                <thead><tr><th>Nº</th><th>Vezes</th><th>%</th><th>Desvio</th></tr></thead>
+                <tbody>
+                    @foreach (var f in analise.MaisFrios(frequencias))
+                    {
+                        <tr>
+                            <td><span class="badge bg-primary">@f.Numero.ToString("D2")</span></td>
+                            <td>@f.Frequencia</td>
+                            <td>@f.Percentual%</td>
+                            <td class="text-primary">@f.Desvio</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Todos os números -->
+        <div class="col-md-4">
+            <h5>Todos os números</h5>
+            <div style="max-height:400px;overflow-y:auto">
+                <table class="table table-dark table-sm">
+                    <thead><tr><th>Nº</th><th>Vezes</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @foreach (var f in frequencias.OrderByDescending(f => f.Frequencia))
+                        {
+                            <tr>
+                                <td>@f.Numero.ToString("D2")</td>
+                                <td>@f.Frequencia</td>
+                                <td>
+                                    @if (f.Status == "Quente")
+                                    {
+                                        <span class="badge bg-danger">Quente</span>
+                                    }
+                                    else if (f.Status == "Frio")
+                                    {
+                                        <span class="badge bg-primary">Frio</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Normal</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private int quantidade = 50;
+    private bool carregando = false;
+    private bool analisado = false;
+    private string erro = string.Empty;
+    private List<ResultadoFrequencia> frequencias = new();
+    private AnaliseFrequencia analise = new();
+
+    private async Task Analisar()
+    {
+        carregando = true;
+        erro = string.Empty;
+        try
+        {
+            var sorteios = await Scraping.BuscarEAtualizarSorteiosAsync(quantidade);
+            frequencias = analise.Analisar(sorteios);
+            analisado = true;
+        }
+        catch (Exception ex)
+        {
+            erro = ex.Message;
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}
