@@ -1,0 +1,168 @@
+@page "/quadrantes"
+@rendermode InteractiveServer
+@using MegaAnalyzer.Models
+@using MegaAnalyzer.Services
+@using MegaAnalyzer.Services.Analysis
+@inject ScrapingService Scraping
+
+<h2>⬛ Análise de Quadrantes</h2>
+
+<div class="mb-3">
+    <label>Últimos quantos sorteios?</label>
+    <input type="number" @bind="quantidade" min="10" max="100" class="form-control w-auto d-inline-block mx-2" />
+    <button class="btn btn-primary" @onclick="Analisar" disabled="@carregando">
+        @(carregando ? "Analisando..." : "🔍 Analisar")
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(erro))
+{
+    <div class="alert alert-danger">@erro</div>
+}
+
+@if (analisado)
+{
+    <div class="row g-4">
+
+        <!-- Mapa da cartela -->
+        <div class="col-md-4">
+            <h5>Mapa da Cartela</h5>
+            <div style="font-family:monospace; font-size:0.85rem; line-height:2">
+                @for (int n = 1; n <= 60; n++)
+                {
+                    var num = n;
+                    var quad = analise.ClassificarQuadrante(num);
+                    var borda = analise.EhBorda(num);
+                    var cor = quad switch {
+                        "A" => "background:#1a472a;color:white",
+                        "B" => "background:#1a3a5c;color:white",
+                        "C" => "background:#5c1a1a;color:white",
+                        _ => "background:#4a3500;color:white"
+                    };
+                    var brd = borda ? "border:2px solid white;" : "border:1px solid #555;";
+                    <span style="display:inline-block;width:32px;text-align:center;margin:1px;padding:2px;border-radius:4px;@cor;@brd">
+                        @num.ToString("D2")
+                    </span>
+                    if (num % 10 == 0) { <br /> }
+                }
+            </div>
+            <div class="mt-2 small">
+                <span style="background:#1a472a;color:white;padding:2px 8px;border-radius:4px">A</span>
+                <span style="background:#1a3a5c;color:white;padding:2px 8px;border-radius:4px" class="ms-1">B</span>
+                <span style="background:#5c1a1a;color:white;padding:2px 8px;border-radius:4px" class="ms-1">C</span>
+                <span style="background:#4a3500;color:white;padding:2px 8px;border-radius:4px" class="ms-1">D</span>
+                <span class="ms-2">⬜ = Borda</span>
+            </div>
+        </div>
+
+        <!-- Padrões mais frequentes -->
+        <div class="col-md-4">
+            <h5>Padrões mais frequentes (@quantidade sorteios)</h5>
+            <table class="table table-dark table-sm">
+                <thead>
+                    <tr><th>Padrão</th><th>Vezes</th><th>%</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in padroes.Take(10))
+                    {
+                        var pct = Math.Round((double)p.Value / quantidade * 100, 1);
+                        <tr>
+                            <td><code>@p.Key</code></td>
+                            <td>@p.Value</td>
+                            <td>
+                                <div class="progress" style="height:16px">
+                                    <div class="progress-bar" style="width:@pct%">@pct%</div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Distribuição de bordas -->
+        <div class="col-md-4">
+            <h5>Qtd de bordas por sorteio</h5>
+            <table class="table table-dark table-sm">
+                <thead>
+                    <tr><th>Bordas</th><th>Vezes</th><th>%</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var b in contBordas)
+                    {
+                        var pct = Math.Round((double)b.Value / quantidade * 100, 1);
+                        var destaque = b.Key is 2 or 3 or 4;
+                        <tr class="@(destaque ? "table-warning" : "")">
+                            <td>@b.Key borda(s)</td>
+                            <td>@b.Value</td>
+                            <td>@pct%</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <!-- Últimos sorteios com quadrantes -->
+    <h5 class="mt-4">Últimos sorteios — distribuição por quadrante</h5>
+    <table class="table table-dark table-sm">
+        <thead>
+            <tr>
+                <th>Concurso</th>
+                <th>Números</th>
+                <th>A</th><th>B</th><th>C</th><th>D</th>
+                <th>Bordas</th><th>Centro</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in sorteios.Take(15))
+            {
+                var nums = s.Numeros.Select(n => n.Valor).ToList();
+                var r = analise.AnalisarSorteio(nums);
+                <tr>
+                    <td>@s.Concurso</td>
+                    <td class="small">@string.Join(" ", nums.Select(n => n.ToString("D2")))</td>
+                    <td>@r.QtdA</td>
+                    <td>@r.QtdB</td>
+                    <td>@r.QtdC</td>
+                    <td>@r.QtdD</td>
+                    <td class="@(r.QtdBorda >= 2 && r.QtdBorda <= 4 ? "text-warning" : "")">@r.QtdBorda</td>
+                    <td>@r.QtdCentro</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private int quantidade = 30;
+    private bool carregando = false;
+    private bool analisado = false;
+    private string erro = string.Empty;
+    private List<Sorteio> sorteios = new();
+    private Dictionary<string, int> padroes = new();
+    private Dictionary<int, int> contBordas = new();
+    private AnaliseQuadrantes analise = new();
+
+    private async Task Analisar()
+    {
+        carregando = true;
+        erro = string.Empty;
+        try
+        {
+            sorteios = await Scraping.BuscarEAtualizarSorteiosAsync(quantidade);
+            padroes = analise.ContarPadroes(sorteios);
+            contBordas = analise.ContarBordasPorSorteio(sorteios);
+            analisado = true;
+        }
+        catch (Exception ex)
+        {
+            erro = ex.Message;
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}
