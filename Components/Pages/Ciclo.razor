@@ -1,0 +1,152 @@
+@page "/ciclo"
+@rendermode InteractiveServer
+@using MegaAnalyzer.Models
+@using MegaAnalyzer.Services
+@using MegaAnalyzer.Services.Analysis
+@inject ScrapingService Scraping
+
+<h2>🔄 Ciclo de Saída</h2>
+
+<div class="mb-3">
+    <label>Últimos quantos sorteios?</label>
+    <input type="number" @bind="quantidade" min="20" max="200" class="form-control w-auto d-inline-block mx-2" />
+    <button class="btn btn-primary" @onclick="Analisar" disabled="@carregando">
+        @(carregando ? "Analisando..." : "🔍 Analisar")
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(erro))
+{
+    <div class="alert alert-danger">@erro</div>
+}
+
+@if (analisado)
+{
+    <div class="row g-4">
+
+        <div class="col-md-6">
+            <h5>⚡ Ciclo Curto — saem a cada ≤7 sorteios</h5>
+            <p class="text-muted small">Números que tendem a aparecer com frequência alta</p>
+            @if (cicloCurto.Count == 0)
+            {
+                <div class="alert alert-warning">Histórico insuficiente. Use mais sorteios.</div>
+            }
+            else
+            {
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    @foreach (var c in cicloCurto)
+                    {
+                        <span class="badge bg-success fs-6" title="Média: @c.MediaCiclo sorteios">
+                            @c.Numero.ToString("D2")
+                        </span>
+                    }
+                </div>
+                <table class="table table-dark table-sm">
+                    <thead><tr><th>Nº</th><th>Média ciclo</th><th>Mín</th><th>Máx</th></tr></thead>
+                    <tbody>
+                        @foreach (var c in cicloCurto)
+                        {
+                            <tr>
+                                <td><span class="badge bg-success">@c.Numero.ToString("D2")</span></td>
+                                <td>@c.MediaCiclo sorteios</td>
+                                <td>@c.MinCiclo</td>
+                                <td>@c.MaxCiclo</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+
+        <div class="col-md-6">
+            <h5>🐢 Ciclo Longo — saem a cada &gt;12 sorteios</h5>
+            <p class="text-muted small">Números que ficam ausentes por mais tempo antes de aparecer</p>
+            @if (cicloLongo.Count == 0)
+            {
+                <div class="alert alert-warning">Histórico insuficiente. Use mais sorteios.</div>
+            }
+            else
+            {
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    @foreach (var c in cicloLongo)
+                    {
+                        <span class="badge bg-danger fs-6" title="Média: @c.MediaCiclo sorteios">
+                            @c.Numero.ToString("D2")
+                        </span>
+                    }
+                </div>
+                <table class="table table-dark table-sm">
+                    <thead><tr><th>Nº</th><th>Média ciclo</th><th>Mín</th><th>Máx</th></tr></thead>
+                    <tbody>
+                        @foreach (var c in cicloLongo)
+                        {
+                            <tr>
+                                <td><span class="badge bg-danger">@c.Numero.ToString("D2")</span></td>
+                                <td>@c.MediaCiclo sorteios</td>
+                                <td>@c.MinCiclo</td>
+                                <td>@c.MaxCiclo</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+
+    </div>
+
+    <h5 class="mt-4">Todos os números por ciclo médio</h5>
+    <div style="font-family:monospace;line-height:2.2">
+        @foreach (var c in todos.OrderBy(c => c.Numero))
+        {
+            var cor = c.Perfil switch {
+                "Ciclo Curto"   => "background:#14532d;color:#86efac",
+                "Ciclo Normal"  => "background:#1f2937;color:#d1d5db",
+                "Ciclo Longo"   => "background:#7f1d1d;color:#fca5a5",
+                _               => "background:#374151;color:#9ca3af"
+            };
+            <span style="display:inline-block;width:38px;text-align:center;margin:2px;padding:3px;border-radius:6px;font-size:0.8rem;@cor"
+                  title="Média: @c.MediaCiclo | Perfil: @c.Perfil">
+                @c.Numero.ToString("D2")
+            </span>
+            if (c.Numero % 10 == 0) { <br /> }
+        }
+    </div>
+    <div class="mt-2 small d-flex gap-2">
+        <span style="background:#14532d;color:#86efac;padding:2px 8px;border-radius:4px">Ciclo Curto ≤7</span>
+        <span style="background:#1f2937;color:#d1d5db;padding:2px 8px;border-radius:4px">Normal</span>
+        <span style="background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:4px">Ciclo Longo &gt;12</span>
+    </div>
+}
+
+@code {
+    private int quantidade = 50;
+    private bool carregando = false;
+    private bool analisado = false;
+    private string erro = string.Empty;
+    private List<ResultadoCiclo> todos = new();
+    private List<ResultadoCiclo> cicloCurto = new();
+    private List<ResultadoCiclo> cicloLongo = new();
+    private AnaliseCiclo analise = new();
+
+    private async Task Analisar()
+    {
+        carregando = true;
+        erro = string.Empty;
+        try
+        {
+            var sorteios = await Scraping.BuscarEAtualizarSorteiosAsync(quantidade);
+            todos = analise.Analisar(sorteios);
+            cicloCurto = analise.CicloCurto(todos);
+            cicloLongo = analise.CicloLongo(todos);
+            analisado = true;
+        }
+        catch (Exception ex)
+        {
+            erro = ex.Message;
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}
