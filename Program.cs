@@ -21,9 +21,7 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
 
 // Serviços
 builder.Services.AddScoped<ScrapingService>();
-
-// Serviços
-builder.Services.AddScoped<ScrapingService>();
+builder.Services.AddScoped<ImportacaoService>();
 builder.Services.AddScoped<AgenteIA>();
 
 var app = builder.Build();

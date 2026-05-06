@@ -56,7 +56,7 @@
 @code {
     protected override async Task OnInitializedAsync()
     {
-        await Atualizar();
+        sorteios = await Scraping.BuscarEAtualizarSorteiosAsync(3003);
     }
     private List<Sorteio> sorteios = new();
     private bool carregando = false;
@@ -68,7 +68,7 @@
         erro = string.Empty;
         try
         {
-            sorteios = await Scraping.BuscarEAtualizarSorteiosAsync(20);
+            sorteios = await Scraping.BuscarEAtualizarSorteiosAsync(3003);
         }
         catch (Exception ex)
         {
